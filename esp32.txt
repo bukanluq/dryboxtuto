@@ -21,12 +21,14 @@ bool isDoorOpen = false;
 // Mirrors exactly what the control logic below decided, so the cloud
 // status always agrees with what Serial Monitor prints.
 bool humidifierIsOn = false;
+int lastHumidity = -1;
+bool lastHumidityValid = false;
 
 /* ---------------------------------------------------------
    SUPABASE CONFIG - fill these in (same project as the webapp)
 --------------------------------------------------------- */
-const char* SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";    // e.g. "https://xxxxxxxx.supabase.co"
-const char* SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";  // Project Settings -> API -> anon public key
+const char* SUPABASE_URL = "https://wombrzqbekhjcehopijd.supabase.co";    // e.g. "https://xxxxxxxx.supabase.co"
+const char* SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndvbWJyenFiZWtoamNlaG9waWpkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzMzEwODIsImV4cCI6MjEwNTkwNzA4Mn0.m_X5WagE-vsfzcSRl2fjLk5ecqe5u43xYrUKNwg3TE0";  // Project Settings -> API -> anon public key
 const char* STATUS_TABLE = "device_status";
 
 unsigned long lastPushMs = 0;
@@ -118,9 +120,6 @@ const unsigned long WIFI_CONNECT_TIMEOUT_MS = 15000;
 
 unsigned long lastSensorReadMs = 0;
 const unsigned long SENSOR_READ_INTERVAL_MS = 1000;
-
-int lastHumidity = -1;
-bool lastHumidityValid = false;
 
 /* ---------------------------------------------------------
    LOCAL STATUS PAGE (handy for debugging on the same network -
