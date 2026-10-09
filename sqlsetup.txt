@@ -1,0 +1,62 @@
+-- =====================================================================
+-- SUPABASE SETUP (fresh install) - run once in SQL Editor
+-- Before running: Storage -> New bucket -> name "item-photos" -> Public ON
+-- =====================================================================
+
+-- 1) Registered items (managed by the webapp)
+create table if not exists items (
+  id bigint generated always as identity primary key,
+  name text not null,
+  device_id text,
+  photo_url text,
+  created_at timestamptz default now()
+);
+
+alter table items enable row level security;
+
+create policy "Public can read items"   on items for select using (true);
+create policy "Public can insert items" on items for insert with check (true);
+create policy "Public can delete items" on items for delete using (true);
+
+-- 2) Live device status (pushed by the ESP32, one row per device)
+create table if not exists device_status (
+  device_id text primary key,
+  humidity integer,
+  humidity_valid boolean,
+  humidifier_on boolean,
+  fan_on boolean,
+  updated_at timestamptz default now()
+);
+
+alter table device_status enable row level security;
+
+create policy "Public can read device status"   on device_status for select using (true);
+create policy "Public can insert device status" on device_status for insert with check (true);
+create policy "Public can update device status" on device_status for update using (true) with check (true);
+
+-- updated_at only auto-sets on INSERT by default; this trigger refreshes it
+-- on every UPDATE too, so the webapp's "offline" check works without
+-- depending on the ESP32's clock.
+create or replace function set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger device_status_set_updated_at
+before insert or update on device_status
+for each row execute function set_updated_at();
+
+-- 3) Photo storage policies for the "item-photos" bucket
+create policy "Public can upload photos"
+on storage.objects for insert
+with check ( bucket_id = 'item-photos' );
+
+create policy "Public can view photos"
+on storage.objects for select
+using ( bucket_id = 'item-photos' );
+
+-- NOTE: these policies make the data readable/writable by anyone holding
+-- your anon key. Fine for a personal/classroom project, not for private data.

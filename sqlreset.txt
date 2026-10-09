@@ -1,0 +1,15 @@
+-- CLEAN RESET for the existing Supabase project.
+-- Drops the tables + trigger so you can re-run supabase-setup.sql fresh.
+-- Your Project URL and anon key stay the same - no need to touch the
+-- ESP32 sketch or the webapp config after this.
+
+drop trigger if exists device_status_set_updated_at on device_status;
+drop function if exists set_updated_at();
+
+drop table if exists device_status;
+drop table if exists items;
+
+-- Removes the photo file *records* for this bucket. To actually free the
+-- storage space (delete the underlying files), it's more reliable to do
+-- it from the dashboard instead: Storage -> item-photos -> select all -> Delete.
+delete from storage.objects where bucket_id = 'item-photos';
