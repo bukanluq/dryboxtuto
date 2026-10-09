@@ -330,6 +330,10 @@ hr{
 
     <div>
         <button onclick="previousDevice()">PREVIOUS</button>
+        
+    </div>
+     <div>
+       
         <button onclick="nextDevice()">NEXT</button>
     </div>
 
@@ -341,8 +345,8 @@ hr{
 
 <script>
 /* ---------- SUPABASE CONFIG - fill these in ---------- */
-const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";       // e.g. "https://xxxxxxxx.supabase.co"
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";     // Project Settings -> API -> anon public key
+const SUPABASE_URL = "https://wombrzqbekhjcehopijd.supabase.co";       // e.g. "https://xxxxxxxx.supabase.co"
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndvbWJyenFiZWtoamNlaG9waWpkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzMzEwODIsImV4cCI6MjEwNTkwNzA4Mn0.m_X5WagE-vsfzcSRl2fjLk5ecqe5u43xYrUKNwg3TE0";     // Project Settings -> API -> anon public key
 const PHOTOS_BUCKET = "item-photos";
 
 const supabaseConfigured = SUPABASE_URL.startsWith("http") && SUPABASE_ANON_KEY.length > 20;
