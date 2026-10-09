@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ESP32 Humidity Controller — Student Handover</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+    --bg:#0E1420;
+    --panel:#141C2B;
+    --panel-2:#101726;
+    --ink:#ECEFF4;
+    --ink-dim:#93A1B5;
+    --ink-faint:#5E6B81;
+    --accent:#5EEAD4;
+    --accent-dim:#2E7D73;
+    --warn:#F0A94A;
+    --danger:#F2756C;
+    --line:#223044;
+    --code-bg:#0A1019;
+    --sans: "IBM Plex Sans", -apple-system, "Segoe UI", Arial, sans-serif;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, Menlo, monospace;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    height:100%;
+}
+@media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+        --bg:#0E1420; --panel:#141C2B; --panel-2:#101726; --ink:#ECEFF4;
+    }
+}
+
+/* ---------- deck shell ---------- */
+#deck{
+    position:relative;
+    height:100vh;
+    overflow:hidden;
+}
+.slide{
+    display:none;
+    position:absolute;
+    inset:0;
+    padding:88px 7vw 96px;
+    overflow-y:auto;
+}
+.slide.active{display:block;}
+
+.topbar{
+    position:fixed;
+    top:env(safe-area-inset-top,0px);
+    left:0; right:0;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:18px 7vw 10px;
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.04em;
+    color:var(--ink-faint);
+    background:linear-gradient(var(--bg) 60%, transparent);
+    z-index:5;
+    pointer-events:none;
+}
+.topbar .part{color:var(--accent);}
+
+.progress{
+    position:fixed;
+    top:env(safe-area-inset-top,0px);
+    left:0; right:0;
+    height:2px;
+    background:var(--line);
+    z-index:6;
+}
+.progress-bar{
+    height:100%;
+    background:var(--accent);
+    width:0%;
+    transition:width .25s ease;
+}
+
+.navbar{
+    position:fixed;
+    bottom:env(safe-area-inset-bottom,0px);
+    left:0; right:0;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 7vw;
+    background:linear-gradient(transparent, var(--bg) 40%);
+    z-index:5;
+}
+.navbar button{
+    font-family:var(--mono);
+    font-size:13px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    color:var(--ink);
+    padding:9px 16px;
+    cursor:pointer;
+    border-radius:3px;
+}
+.navbar button:hover{border-color:var(--accent); color:var(--accent);}
+.navbar button:disabled{opacity:.3; cursor:default;}
+.navbar button:disabled:hover{border-color:var(--line); color:var(--ink);}
+#jump{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--ink-faint);
+    background:transparent;
+    border:none;
+}
+
+/* ---------- typography ---------- */
+h1{
+    font-size:clamp(28px,4vw,44px);
+    font-weight:700;
+    line-height:1.15;
+    margin:0 0 6px;
+    letter-spacing:-0.01em;
+}
+h2{
+    font-size:clamp(22px,3vw,32px);
+    font-weight:700;
+    line-height:1.2;
+    margin:0 0 22px;
+    border-left:3px solid var(--accent);
+    padding-left:16px;
+}
+h3{
+    font-size:17px;
+    font-weight:600;
+    color:var(--accent);
+    margin:28px 0 10px;
+}
+p{line-height:1.6; color:var(--ink); max-width:760px;}
+.lede{font-size:18px; color:var(--ink-dim); max-width:720px;}
+.kicker{
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--ink-faint);
+    margin-bottom:10px;
+}
+ul,ol{line-height:1.7; max-width:760px; padding-left:22px;}
+li{margin-bottom:6px;}
+a{color:var(--accent);}
+strong{color:var(--ink); font-weight:600;}
+.dim{color:var(--ink-dim);}
+code{font-family:var(--mono); background:var(--code-bg); padding:1px 6px; border-radius:3px; font-size:0.92em; color:var(--accent);}
+
+/* ---------- dividers ---------- */
+.divider{
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+}
+.divider .num{
+    font-family:var(--mono);
+    font-size:15px;
+    color:var(--accent);
+    margin-bottom:14px;
+}
+.divider h1{font-size:clamp(34px,6vw,58px);}
+.divider p{font-size:19px; color:var(--ink-dim);}
+
+/* ---------- panels / cards ---------- */
+.panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:18px 20px;
+    margin:14px 0;
+}
+.panel-title{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--ink-faint);
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    margin-bottom:8px;
+}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+.grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;}
+@media (max-width:860px){.grid2,.grid3{grid-template-columns:1fr;}}
+
+.callout{
+    border-left:3px solid var(--warn);
+    background:rgba(240,169,74,0.08);
+    padding:12px 16px;
+    margin:16px 0;
+    max-width:760px;
+    font-size:14.5px;
+}
+.callout strong{color:var(--warn);}
+.callout.danger{border-left-color:var(--danger); background:rgba(242,117,108,0.08);}
+.callout.danger strong{color:var(--danger);}
+.callout.good{border-left-color:var(--accent); background:rgba(94,234,212,0.07);}
+.callout.good strong{color:var(--accent);}
+
+/* ---------- tables ---------- */
+table{
+    width:100%;
+    max-width:960px;
+    border-collapse:collapse;
+    font-size:14.5px;
+    margin:14px 0 24px;
+}
+th,td{
+    text-align:left;
+    padding:9px 12px;
+    border-bottom:1px solid var(--line);
+    vertical-align:top;
+}
+th{
+    font-family:var(--mono);
+    font-size:11.5px;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    color:var(--ink-faint);
+    border-bottom:1px solid var(--accent-dim);
+}
+tr:hover td{background:rgba(255,255,255,0.015);}
+td code{white-space:nowrap;}
+
+/* ---------- code blocks ---------- */
+pre{
+    background:var(--code-bg);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:16px 18px;
+    overflow-x:auto;
+    overflow-y:auto;
+    font-family:var(--mono);
+    font-size:13px;
+    line-height:1.55;
+    max-width:960px;
+    color:#D7E0EC;
+}
+pre.tall{max-height:62vh;}
+.code-label{
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--ink-faint);
+    margin-bottom:6px;
+}
+.tok-kw{color:#C792EA;}
+.tok-type{color:#82AAFF;}
+.tok-str{color:#C3E88D;}
+.tok-com{color:#5E6B81; font-style:italic;}
+.tok-fn{color:#5EEAD4;}
+
+/* ---------- step lists ---------- */
+.steps{counter-reset:step; list-style:none; padding-left:0; max-width:760px;}
+.steps li{
+    counter-increment:step;
+    position:relative;
+    padding-left:40px;
+    margin-bottom:16px;
+}
+.steps li::before{
+    content:counter(step);
+    position:absolute;
+    left:0; top:0;
+    width:26px; height:26px;
+    border:1px solid var(--accent);
+    color:var(--accent);
+    font-family:var(--mono);
+    font-size:12px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:3px;
+}
+
+/* ---------- checklist ---------- */
+.checklist{list-style:none; padding-left:0; max-width:620px;}
+.checklist li{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    margin-bottom:9px;
+    font-size:15px;
+}
+.checklist li::before{
+    content:"";
+    flex:0 0 16px;
+    width:16px; height:16px;
+    margin-top:3px;
+    border:1px solid var(--ink-faint);
+    border-radius:3px;
+}
+
+/* ---------- diagram boxes ---------- */
+.flow{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:0;
+    margin:20px 0;
+}
+.flow .node{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:12px 16px;
+    font-size:13.5px;
+    text-align:center;
+    min-width:130px;
+}
+.flow .node .t{font-family:var(--mono); font-size:11px; color:var(--accent); display:block; margin-bottom:4px;}
+.flow .arrow{
+    color:var(--ink-faint);
+    padding:0 10px;
+    font-family:var(--mono);
+    font-size:16px;
+}
+@media (max-width:860px){
+    .flow{flex-direction:column; align-items:stretch;}
+    .flow .arrow{transform:rotate(90deg); align-self:center; padding:4px 0;}
+}
+
+.badge{
+    display:inline-block;
+    font-family:var(--mono);
+    font-size:11px;
+    border:1px solid var(--line);
+    color:var(--ink-dim);
+    padding:2px 8px;
+    border-radius:3px;
+    margin-right:6px;
+}
+
+.two-col{display:grid; grid-template-columns:1.1fr 1fr; gap:28px; align-items:start;}
+@media (max-width:900px){.two-col{grid-template-columns:1fr;}}
+
+.footnote{font-size:12.5px; color:var(--ink-faint); margin-top:10px; max-width:760px;}
+</style>
+</head>
+<body>
+
+<div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+<div class="topbar">
+    <span class="part" id="partLabel">Intro</span>
+    <span id="slideCounter">1 / 1</span>
+</div>
+
+<div id="deck"></div>
+
+<div class="navbar">
+    <button id="prevBtn" onclick="goTo(current-1)">&larr; Prev</button>
+    <select id="jump" onchange="goTo(this.selectedIndex)"></select>
+    <button id="nextBtn" onclick="goTo(current+1)">Next &rarr;</button>
+</div>
+
+<script id="slide-data" type="application/json"></script>
+
+<!-- ============================================================ -->
+<!-- SLIDE CONTENT                                                 -->
+<!-- ============================================================ -->
+<template id="slides-template">
+
+<section class="slide" data-part="Intro">
+<div class="divider">
+<div class="num">HANDOVER DECK</div>
+<h1>ESP32 Humidity Controller<br>with Cloud Monitoring</h1>
+<p>A complete reference for how the system works, how to test it piece by piece, and how to rebuild it from zero.</p>
+<div class="footnote" style="margin-top:28px;">Instructor: [NAME] &nbsp;·&nbsp; Version: [VERSION] &nbsp;·&nbsp; Last updated: [DATE]</div>
+</div>
+</section>
+
+<section class="slide" data-part="Intro">
+<h2>What you'll walk away with</h2>
+<div class="grid3">
+<div class="panel">
+<div class="panel-title">Part 1</div>
+<h3 style="margin-top:0;">How Everything Works</h3>
+<p class="dim">The architecture, the hardware, the software, and how data moves through the whole system end to end.</p>
+</div>
+<div class="panel">
+<div class="panel-title">Part 2</div>
+<h3 style="margin-top:0;">Learn, Test, Understand</h3>
+<p class="dim">Core concepts, seven small experiments, a phase-by-phase build of the code, troubleshooting, and extension challenges.</p>
+</div>
+<div class="panel">
+<div class="panel-title">Part 3</div>
+<h3 style="margin-top:0;">Replicate the Project</h3>
+<p class="dim">Full parts list, software setup, wiring, the complete code, and a final checklist to build it from scratch.</p>
+</div>
+</div>
+<div class="callout good" style="margin-top:20px;"><strong>How to use this deck —</strong> It's built to be read in order the first time, then used as a reference afterward. Use the jump menu or arrow keys to move around once you've been through it once.</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- PART 1 -->
+<!-- ============================================================ -->
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<div class="divider">
+<div class="num">PART 1 / 3</div>
+<h1>How Everything Works</h1>
+<p>Understand the complete system before touching any hardware.</p>
+</div>
+</section>
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<h2>1.1 &nbsp;System Overview</h2>
+<p class="lede">We're building a humidity-controlled enclosure: a sensor reads the air, the ESP32 decides whether to run a humidifier and a vent fan, shows the reading on a small screen, and — unlike a typical standalone Arduino project — also publishes its status to the internet so it can be checked from any phone or laptop, on any network.</p>
+<h3>Why the cloud matters here</h3>
+<p>A plain microcontroller project is only visible to someone standing next to it, or on the same WiFi network. We add one more layer — a cloud database — specifically so <strong>monitoring works from anywhere</strong>, which is the whole point of the companion webapp you'll also build.</p>
+</section>
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<h2>1.2 &nbsp;Architecture Diagram</h2>
+<div class="flow">
+<div class="node"><span class="t">SENSOR</span>DHT11<br>Humidity Input</div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">CONTROLLER</span>ESP32<br>Reads &amp; Decides</div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">OUTPUT</span>Relay + Fan<br>Physical Action</div>
+</div>
+<div class="flow">
+<div class="node"><span class="t">CONTROLLER</span>ESP32</div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">NETWORK</span>WiFi &rarr; HTTPS</div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">CLOUD</span>Supabase<br>(Database)</div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">APP</span>Webapp<br>(Any Device)</div>
+</div>
+<p class="footnote">Two independent loops: the local control loop (top) runs every second regardless of network state. The cloud reporting loop (bottom) runs every few seconds and only needs WiFi — if it fails, local control is unaffected.</p>
+</section>
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<h2>1.3 &nbsp;End-to-End Data Flow</h2>
+<ol class="steps">
+<li><strong>Sensor read.</strong> The ESP32 asks the DHT11 for a humidity reading once per second.</li>
+<li><strong>Decision.</strong> The ESP32 compares the reading against thresholds (below 45% / above 55%) and decides whether the humidifier and fan should be on or off.</li>
+<li><strong>Local output.</strong> The ESP32 writes to the relay (humidifier) and fan pins, and updates the LCD screen.</li>
+<li><strong>Cloud push.</strong> Every 5 seconds, the ESP32 sends its current status as JSON to a Supabase database table over HTTPS.</li>
+<li><strong>Webapp read.</strong> The webapp, running on any phone or laptop, polls that same database row every few seconds.</li>
+<li><strong>Display.</strong> The webapp shows humidity, humidifier state, and fan state, and marks the device "offline" if no update has arrived recently.</li>
+</ol>
+<div class="callout"><strong>Key idea —</strong> The webapp never talks to the ESP32 directly. It only talks to Supabase. The ESP32 only talks to Supabase too. This "push, don't pull" design is what makes monitoring work from any network — more on why in section 1.5.</div>
+</section>
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<h2>1.4 &nbsp;Hardware at a Glance</h2>
+<table>
+<tr><th>Component</th><th>Role</th><th>Interface</th></tr>
+<tr><td>ESP32 development board</td><td>Main controller — runs all logic, WiFi, and the cloud connection</td><td>—</td></tr>
+<tr><td>DHT11</td><td>Measures relative humidity (and temperature, unused here)</td><td>Single-wire digital</td></tr>
+<tr><td>16×2 LCD with I2C backpack</td><td>Shows device ID and live humidity on-device</td><td>I2C</td></tr>
+<tr><td>Relay or transistor module</td><td>Switches the humidifier on/off (ESP32 GPIO can't drive it directly)</td><td>Digital GPIO</td></tr>
+<tr><td>Fan / vent actuator</td><td>Ventilates the enclosure when humidity is high</td><td>Digital GPIO</td></tr>
+</table>
+<p class="dim">Each component is covered in detail on the following slides, including exact pins, voltages, and common mistakes.</p>
+</section>
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<h2>1.4.1 &nbsp;Hardware — ESP32 Development Board</h2>
+<div class="two-col">
+<div>
+<p>The ESP32 is a microcontroller with <strong>built-in WiFi</strong>, which is why it's used here instead of a plain Arduino Uno — the cloud-reporting feature in Part 1.2 requires it.</p>
+<h3>Specifications</h3>
+<ul>
+<li>Operating voltage: <strong>3.3V logic</strong> (GPIO pins are <strong>not</strong> 5V tolerant)</li>
+<li>Typically powered via USB (5V in, regulated to 3.3V on-board)</li>
+<li>Has built-in WiFi (802.11 b/g/n) used for all cloud communication</li>
+</ul>
+</div>
+<div class="panel">
+<div class="panel-title">Common mistakes</div>
+<ul style="margin:0;">
+<li>Feeding 5V directly into a GPIO pin — this can damage the board.</li>
+<li>Not selecting the correct board variant under <code>Tools &gt; Board</code> before uploading.</li>
+<li>Using a USB cable that is power-only (no data lines).</li>
+</ul>
+</div>
+</div>
+<div class="callout danger"><strong>Strapping pins —</strong> GPIO 0, 2, 5, 12, and 15 affect the ESP32's boot mode. This project uses <strong>GPIO 2</strong> (fan) and <strong>GPIO 5</strong> (humidifier) — both strapping pins. They work fine as regular outputs once the board has booted, but anything wired to them can glitch briefly <em>during</em> boot/reset, and a device pulling GPIO 2 high at boot can interfere with flashing. Keep this in mind if you swap pins later.</div>
+</section>
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<h2>1.4.2 &nbsp;Hardware — DHT11 Humidity Sensor</h2>
+<div class="two-col">
+<div>
+<p>A low-cost digital sensor that reports humidity (and temperature) over a single data wire using its own timing-based protocol — not I2C or SPI.</p>
+<h3>Specifications</h3>
+<ul>
+<li>Humidity range: 20–90% RH, accuracy ±5%</li>
+<li>Supply voltage: 3.3V–5.5V</li>
+<li><strong>Maximum sampling rate: 1 reading per second</strong> — this is exactly why the code reads it once every 1000ms, not faster</li>
+<li>Data pin needs a pull-up resistor (10kΩ) to the supply voltage if you're using a bare sensor; most 3-pin breakout modules already include it</li>
+</ul>
+</div>
+<div class="panel">
+<div class="panel-title">Wiring (this project)</div>
+<table style="margin:0;">
+<tr><th>DHT11 Pin</th><th>ESP32 Pin</th></tr>
+<tr><td>VCC</td><td>3.3V</td></tr>
+<tr><td>GND</td><td>GND</td></tr>
+<tr><td>DATA</td><td><code>GPIO 4</code></td></tr>
+</table>
+</div>
+</div>
+<div class="callout"><strong>Common mistake —</strong> Reading faster than once per second returns stale or garbage values — the sensor simply can't sample that quickly. If you see repeated checksum errors, this is the first thing to check.</div>
+</section>
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<h2>1.4.3 &nbsp;Hardware — 16×2 I2C LCD</h2>
+<div class="two-col">
+<div>
+<p>A character display controlled over I2C via a small <strong>PCF8574</strong> "backpack" chip soldered to the back — this is what turns 16 individual control wires into just two (SDA/SCL).</p>
+<h3>Specifications</h3>
+<ul>
+<li>I2C address is almost always <strong>0x27</strong> or <strong>0x3F</strong> depending on the backpack chip variant</li>
+<li>On a standard ESP32 dev board, the default I2C pins are <strong>SDA = GPIO 21</strong>, <strong>SCL = GPIO 22</strong></li>
+<li>Has an on-board contrast potentiometer — if the screen looks blank or all-black blocks, adjust this first</li>
+</ul>
+</div>
+<div class="panel">
+<div class="panel-title">Wiring (this project)</div>
+<table style="margin:0;">
+<tr><th>LCD Pin</th><th>ESP32 Pin</th></tr>
+<tr><td>VCC</td><td>5V (VIN)</td></tr>
+<tr><td>GND</td><td>GND</td></tr>
+<tr><td>SDA</td><td><code>GPIO 21</code></td></tr>
+<tr><td>SCL</td><td><code>GPIO 22</code></td></tr>
+</table>
+</div>
+</div>
+<div class="callout danger"><strong>Safety consideration —</strong> Most I2C LCD backpacks run at 5V and pull the SDA/SCL lines up to 5V. ESP32 GPIO pins are only rated for 3.3V. In practice this is widely used anyway in hobby projects, but the safer option — if your backpack allows it — is powering the LCD from 3.3V instead of 5V to keep the whole I2C bus at a safe voltage. If the display is unreliable or you want to be cautious, use a logic-level shifter on SDA/SCL.</div>
+</section>
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<h2>1.4.4 &nbsp;Hardware — Humidifier &amp; Fan Outputs</h2>
+<p>The ESP32 cannot power a humidifier or fan motor directly — GPIO pins can only supply a few milliamps. Both outputs are switched through a <strong>relay module or transistor driver</strong>, with the ESP32 only sending the small on/off control signal.</p>
+<table>
+<tr><th>Output</th><th>ESP32 Pin</th><th>Driven via</th><th>Logic</th></tr>
+<tr><td>Humidifier</td><td><code>GPIO 5</code></td><td>Relay / transistor module</td><td>HIGH = on, LOW = off (in this code)</td></tr>
+<tr><td>Fan</td><td><code>GPIO 2</code></td><td>Relay / transistor module</td><td>HIGH = on, LOW = off (in this code)</td></tr>
+</table>
+<div class="callout danger"><strong>Safety —</strong> If the humidifier or fan is a motor (inductive load), always use a driver module with a flyback diode, or one that already includes one (most relay modules do). Driving a motor directly from a bare transistor with no diode can destroy the transistor and potentially the ESP32 pin when the motor switches off.</div>
+<div class="callout"><strong>Common mistake —</strong> Confusing active-HIGH and active-LOW relay modules. Some relay boards turn <em>on</em> when the signal pin goes LOW. If your relay behaves backwards from what the Serial Monitor reports, this is almost always why — check your specific module's datasheet.</div>
+</section>
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<h2>1.5 &nbsp;Software Overview</h2>
+<table>
+<tr><th>Layer</th><th>What it is</th><th>Why it's used</th></tr>
+<tr><td>Arduino IDE + ESP32 core</td><td>Compiles and uploads the firmware</td><td>Standard, well-supported toolchain for ESP32</td></tr>
+<tr><td>ESP32 firmware (.ino)</td><td>Reads the sensor, controls outputs, runs WiFi setup, pushes status</td><td>Runs entirely on the device, no PC required after upload</td></tr>
+<tr><td>Supabase</td><td>Hosted Postgres database + REST API</td><td>Free tier, no server to manage, reachable over HTTPS from anywhere</td></tr>
+<tr><td>Webapp (HTML/JS)</td><td>Register devices, view live status, manage photos</td><td>Works on any phone/laptop with a browser — no app install</td></tr>
+<tr><td>Vercel (or similar)</td><td>Hosts the webapp as a public HTTPS link</td><td>Free static hosting, one link to share</td></tr>
+</table>
+</section>
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<h2>1.6 &nbsp;Libraries &amp; Dependencies</h2>
+<table>
+<tr><th>Library</th><th>Used for</th><th>Install as</th></tr>
+<tr><td><code>DHT11</code></td><td>Reading the humidity sensor</td><td>Library Manager → search exactly <code>"DHT11"</code> (by dhrubasaha08)</td></tr>
+<tr><td><code>LiquidCrystal_I2C</code></td><td>Driving the I2C LCD</td><td>Library Manager → search <code>"LiquidCrystal I2C"</code> (by Frank de Brabander)</td></tr>
+<tr><td><code>Wire</code></td><td>I2C bus support</td><td>Built into the ESP32 core — no install needed</td></tr>
+<tr><td><code>WiFi</code>, <code>WebServer</code>, <code>Preferences</code>, <code>HTTPClient</code>, <code>WiFiClientSecure</code></td><td>WiFi, local config server, saved settings, HTTPS requests</td><td>All built into the ESP32 core — no install needed</td></tr>
+<tr><td><code>@supabase/supabase-js</code> v2</td><td>Talking to Supabase from the webapp</td><td>Loaded via CDN in the webapp's HTML — no install needed</td></tr>
+</table>
+<div class="callout"><strong>Watch out —</strong> There are several different Arduino libraries with very similar names for the DHT11 (an older one uses <code>&lt;dht11.h&gt;</code>, lowercase, with a completely different API: <code>DHT.read(pin)</code>). If your code won't compile against the method names in this deck, you likely installed the wrong one — uninstall it and search for the exact name above.</div>
+</section>
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<h2>1.7 &nbsp;Communication Methods Used</h2>
+<table>
+<tr><th>Method</th><th>Where it's used</th><th>Notes</th></tr>
+<tr><td>Single-wire digital</td><td>ESP32 ↔ DHT11</td><td>Custom timing-based protocol, not a standard bus</td></tr>
+<tr><td>I2C</td><td>ESP32 ↔ LCD</td><td>2-wire (SDA/SCL), address 0x27 or 0x3F</td></tr>
+<tr><td>GPIO digital output</td><td>ESP32 → relay/fan</td><td>Simple HIGH/LOW signal</td></tr>
+<tr><td>WiFi</td><td>ESP32 ↔ router/hotspot</td><td>Required for any cloud feature</td></tr>
+<tr><td>HTTP (local)</td><td>Browser ↔ ESP32's own setup page</td><td>Only used during WiFi setup, on the same network</td></tr>
+<tr><td>HTTPS / REST</td><td>ESP32 → Supabase, Webapp ↔ Supabase</td><td>The actual monitoring path — works over the internet, not just local WiFi</td></tr>
+</table>
+<h3>Example: what the ESP32 actually sends</h3>
+<div class="code-label">HTTPS POST to Supabase every 5 seconds</div>
+<pre><span class="tok-com">POST /rest/v1/device_status?on_conflict=device_id</span>
+<span class="tok-com">Headers: apikey, Authorization, Prefer: resolution=merge-duplicates</span>
+{
+  <span class="tok-str">"device_id"</span>: <span class="tok-str">"A1B2C3"</span>,
+  <span class="tok-str">"humidity"</span>: <span class="tok-str">52</span>,
+  <span class="tok-str">"humidity_valid"</span>: <span class="tok-kw">true</span>,
+  <span class="tok-str">"humidifier_on"</span>: <span class="tok-kw">false</span>,
+  <span class="tok-str">"fan_on"</span>: <span class="tok-kw">false</span>
+}</pre>
+</section>
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<h2>1.8 &nbsp;What Happens When Communication Fails</h2>
+<div class="grid2">
+<div class="panel">
+<div class="panel-title">WiFi connection fails</div>
+<p style="margin:0;">After a 15-second timeout, the ESP32 gives up on the saved network and starts its own setup Access Point (<code>ESP32-Setup-&lt;ID&gt;</code>) so it can be reconfigured. Sensor readings and local relay/fan control <strong>keep working</strong> the whole time — only the cloud push is affected.</p>
+</div>
+<div class="panel">
+<div class="panel-title">Cloud push fails</div>
+<p style="margin:0;">The HTTP response code is printed to Serial Monitor for debugging. The next attempt happens automatically 5 seconds later — nothing needs to be restarted. Local control is completely unaffected.</p>
+</div>
+<div class="panel">
+<div class="panel-title">Webapp can't reach Supabase</div>
+<p style="margin:0;">The fetch fails, the webapp shows the item as "Offline," and tries again on the next poll a few seconds later.</p>
+</div>
+<div class="panel">
+<div class="panel-title">Device stops pushing (powered off)</div>
+<p style="margin:0;">Its last database row simply stops updating. The webapp checks the row's timestamp and marks it "Offline" once it's gone stale, even though the old data is technically still sitting there.</p>
+</div>
+</div>
+</section>
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<h2>1.9 &nbsp;Code Structure</h2>
+<div class="flow">
+<div class="node"><span class="t">INPUT</span>readAndControl-<br>Humidity()</div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">PROCESSING</span>Threshold logic<br>in loop()</div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">COMMUNICATION</span>pushStatus-<br>ToSupabase()</div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">OUTPUT</span>LCD + relay<br>+ fan + cloud</div>
+</div>
+<table>
+<tr><th>Function</th><th>Responsibility</th></tr>
+<tr><td><code>setup()</code></td><td>Runs once: pin modes, LCD init, compute device ID, start WiFi</td></tr>
+<tr><td><code>loop()</code></td><td>Runs forever: handles web server requests, triggers sensor reads every 1s, triggers cloud pushes every 5s — all using non-blocking timers (<code>millis()</code>), never <code>delay()</code>, so nothing stalls the others</td></tr>
+<tr><td><code>readAndControlHumidity()</code></td><td>Reads the DHT11, updates the LCD, decides relay/fan state</td></tr>
+<tr><td><code>pushStatusToSupabase()</code></td><td>Builds the JSON payload and sends it via HTTPS</td></tr>
+<tr><td><code>connectWithSavedCredentials()</code> / <code>startAPMode()</code></td><td>WiFi provisioning — covered next</td></tr>
+</table>
+<div class="callout good"><strong>Key pattern —</strong> Using <code>millis()</code> timers instead of <code>delay()</code> is what lets the sensor read, the cloud push, and the local web server all happen "at the same time" on a single-threaded microcontroller. This is one of the most important habits to learn from this codebase.</div>
+</section>
+
+<section class="slide" data-part="Part 1 — How Everything Works">
+<h2>1.10 &nbsp;WiFi Provisioning Flow</h2>
+<p>The device never has WiFi credentials hardcoded. The first time it boots (or after a reset), it has no saved network, so it creates its own temporary Access Point for you to configure it from any phone or laptop.</p>
+<div class="flow">
+<div class="node"><span class="t">BOOT</span>Check saved<br>WiFi (flash)</div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">FOUND?</span>Try connecting<br>(15s timeout)</div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">SUCCESS</span>Run normally<br>+ push to cloud</div>
+</div>
+<div class="flow">
+<div class="node" style="border-color:var(--warn);"><span class="t" style="color:var(--warn);">NOT FOUND / FAILED</span>Start Access Point<br><code>ESP32-Setup-&lt;ID&gt;</code></div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">USER</span>Visits setup page,<br>picks a network</div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">SAVE</span>Credentials saved<br>to flash, reboots</div>
+</div>
+<p class="footnote">Credentials are stored using the ESP32's <strong>Preferences</strong> library, which writes to a reserved flash partition (NVS — Non-Volatile Storage) that survives power loss and reboots.</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- PART 2 -->
+<!-- ============================================================ -->
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<div class="divider">
+<div class="num">PART 2 / 3</div>
+<h1>Learn, Test, and Understand</h1>
+<p>Build up to the full system piece by piece — don't just copy the final code.</p>
+</div>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>2.1 &nbsp;Basic Concepts You Need First</h2>
+<div class="grid2">
+<div>
+<h3>Electronics</h3>
+<ul>
+<li><strong>Digital vs analog</strong> — a digital signal is only HIGH or LOW (0V or 3.3V); analog varies continuously. Everything in this project is digital.</li>
+<li><strong>Input vs output</strong> — a sensor is an input (the ESP32 reads it); a relay/fan is an output (the ESP32 controls it).</li>
+<li><strong>Sensor</strong> — converts a physical quantity (humidity) into an electrical signal.</li>
+<li><strong>Actuator</strong> — converts an electrical signal into physical action (fan spinning, relay switching).</li>
+</ul>
+</div>
+<div>
+<h3>Programming</h3>
+<ul>
+<li><strong>Variable</strong> — a named storage slot, e.g. <code>lastHumidity</code>.</li>
+<li><strong>Function</strong> — a named, reusable block of code, e.g. <code>readAndControlHumidity()</code>.</li>
+<li><strong>Condition</strong> (<code>if</code>/<code>else</code>) — branches the code based on a true/false check.</li>
+<li><strong>Loop</strong> — the <code>loop()</code> function itself runs forever, automatically, after <code>setup()</code> finishes once.</li>
+</ul>
+</div>
+</div>
+<h3>Networking (just enough to follow this project)</h3>
+<ul>
+<li><strong>Microcontroller</strong> — a small computer on a single chip (the ESP32) that runs one program forever, with no operating system.</li>
+<li><strong>REST API</strong> — a way for two programs to talk over HTTP using plain URLs and JSON data, which is how the ESP32 talks to Supabase.</li>
+<li><strong>JSON</strong> — a simple text format for structured data, e.g. <code>{"humidity": 52}</code>.</li>
+</ul>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>2.2 &nbsp;Small Experiments — Overview</h2>
+<p class="lede">Verify each piece in isolation before combining anything. If something doesn't work later, you'll already know which piece to suspect.</p>
+<table>
+<tr><th>#</th><th>Test</th><th>Verifies</th></tr>
+<tr><td>1</td><td>Board check</td><td>The ESP32 itself, uploading, Serial Monitor</td></tr>
+<tr><td>2</td><td>Sensor read</td><td>DHT11 wiring and library</td></tr>
+<tr><td>3</td><td>LCD display</td><td>I2C wiring, address, library</td></tr>
+<tr><td>4</td><td>Output control</td><td>Relay/fan wiring and logic</td></tr>
+<tr><td>5</td><td>WiFi connect</td><td>Network credentials, antenna/signal</td></tr>
+<tr><td>6</td><td>Cloud push</td><td>Supabase project, keys, table, policies</td></tr>
+<tr><td>7</td><td>Full combine</td><td>Everything together, end to end</td></tr>
+</table>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>Test 1 — Board Check</h2>
+<div class="panel"><div class="panel-title">Objective</div>Confirm the ESP32 board, drivers, and Arduino IDE setup all work before touching any sensors.</div>
+<div class="panel"><div class="panel-title">Required components</div>ESP32 dev board, USB cable only.</div>
+<div class="code-label">Code</div>
+<pre><span class="tok-kw">void</span> <span class="tok-fn">setup</span>() {
+  Serial.<span class="tok-fn">begin</span>(<span class="tok-str">115200</span>);
+  Serial.<span class="tok-fn">println</span>(<span class="tok-str">"ESP32 is alive!"</span>);
+}
+
+<span class="tok-kw">void</span> <span class="tok-fn">loop</span>() {
+  Serial.<span class="tok-fn">println</span>(<span class="tok-str">"Still running..."</span>);
+  <span class="tok-fn">delay</span>(<span class="tok-str">1000</span>);
+}</pre>
+<div class="grid2">
+<div class="panel"><div class="panel-title">Expected result</div>Serial Monitor (115200 baud) prints "Still running..." once per second.</div>
+<div class="panel"><div class="panel-title">Common mistakes</div>Wrong board selected under <code>Tools &gt; Board</code>; wrong COM/serial port; Serial Monitor baud rate not set to 115200.</div>
+</div>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>Test 2 — Read the DHT11</h2>
+<div class="panel"><div class="panel-title">Objective</div>Confirm the sensor is wired correctly and the library is installed correctly.</div>
+<div class="panel"><div class="panel-title">Wiring</div>DHT11 DATA → <code>GPIO 4</code>, VCC → 3.3V, GND → GND.</div>
+<div class="code-label">Code</div>
+<pre><span class="tok-kw">#include</span> &lt;DHT11.h&gt;
+DHT11 dht11(<span class="tok-str">4</span>);
+
+<span class="tok-kw">void</span> <span class="tok-fn">setup</span>() { Serial.<span class="tok-fn">begin</span>(<span class="tok-str">115200</span>); }
+
+<span class="tok-kw">void</span> <span class="tok-fn">loop</span>() {
+  <span class="tok-kw">int</span> humidity = dht11.<span class="tok-fn">readHumidity</span>();
+  <span class="tok-kw">if</span> (humidity != DHT11::ERROR_CHECKSUM &amp;&amp; humidity != DHT11::ERROR_TIMEOUT) {
+    Serial.<span class="tok-fn">println</span>(humidity);
+  } <span class="tok-kw">else</span> {
+    Serial.<span class="tok-fn">println</span>(DHT11::<span class="tok-fn">getErrorString</span>(humidity));
+  }
+  <span class="tok-fn">delay</span>(<span class="tok-str">1000</span>); <span class="tok-com">// DHT11 can't be read faster than 1x/sec</span>
+}</pre>
+<div class="grid2">
+<div class="panel"><div class="panel-title">Expected result</div>A humidity percentage (roughly 30–70% indoors) prints once per second.</div>
+<div class="panel"><div class="panel-title">Troubleshooting</div>Constant checksum errors → check the pull-up resistor / wiring; try a different GPIO; confirm you installed <code>DHT11</code> by dhrubasaha08, not a different DHT library.</div>
+</div>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>Test 3 — LCD Display</h2>
+<div class="panel"><div class="panel-title">Objective</div>Confirm the I2C LCD is wired correctly and shows text.</div>
+<div class="panel"><div class="panel-title">Wiring</div>SDA → <code>GPIO 21</code>, SCL → <code>GPIO 22</code>, VCC → 5V, GND → GND.</div>
+<div class="code-label">Code</div>
+<pre><span class="tok-kw">#include</span> &lt;LiquidCrystal_I2C.h&gt;
+LiquidCrystal_I2C led(<span class="tok-str">0x27</span>, <span class="tok-str">16</span>, <span class="tok-str">2</span>);
+
+<span class="tok-kw">void</span> <span class="tok-fn">setup</span>() {
+  led.<span class="tok-fn">init</span>();
+  led.<span class="tok-fn">backlight</span>();
+  led.<span class="tok-fn">setCursor</span>(<span class="tok-str">0</span>, <span class="tok-str">0</span>);
+  led.<span class="tok-fn">print</span>(<span class="tok-str">"Hello, LCD!"</span>);
+}
+
+<span class="tok-kw">void</span> <span class="tok-fn">loop</span>() {}</pre>
+<div class="grid2">
+<div class="panel"><div class="panel-title">Expected result</div>"Hello, LCD!" appears on the top-left of the screen.</div>
+<div class="panel"><div class="panel-title">Troubleshooting</div>Blank screen → adjust the contrast potentiometer on the back of the module. Nothing at all → try address <code>0x3F</code> instead of <code>0x27</code>, or run an I2C scanner sketch to find the real address.</div>
+</div>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>Test 4 — Control the Outputs</h2>
+<div class="panel"><div class="panel-title">Objective</div>Confirm the relay/fan wiring and logic levels before connecting to real sensor logic.</div>
+<div class="panel"><div class="panel-title">Wiring</div>Humidifier relay signal → <code>GPIO 5</code>, fan relay signal → <code>GPIO 2</code>.</div>
+<div class="code-label">Code</div>
+<pre><span class="tok-kw">const</span> <span class="tok-kw">int</span> humidifierPin = <span class="tok-str">5</span>;
+<span class="tok-kw">const</span> <span class="tok-kw">int</span> fanPin = <span class="tok-str">2</span>;
+
+<span class="tok-kw">void</span> <span class="tok-fn">setup</span>() {
+  <span class="tok-fn">pinMode</span>(humidifierPin, OUTPUT);
+  <span class="tok-fn">pinMode</span>(fanPin, OUTPUT);
+}
+
+<span class="tok-kw">void</span> <span class="tok-fn">loop</span>() {
+  <span class="tok-fn">digitalWrite</span>(humidifierPin, HIGH);
+  <span class="tok-fn">digitalWrite</span>(fanPin, LOW);
+  <span class="tok-fn">delay</span>(<span class="tok-str">2000</span>);
+  <span class="tok-fn">digitalWrite</span>(humidifierPin, LOW);
+  <span class="tok-fn">digitalWrite</span>(fanPin, HIGH);
+  <span class="tok-fn">delay</span>(<span class="tok-str">2000</span>);
+}</pre>
+<div class="grid2">
+<div class="panel"><div class="panel-title">Expected result</div>The relays click on and off alternately, every 2 seconds.</div>
+<div class="panel"><div class="panel-title">Troubleshooting</div>Behaves backwards (on when you expect off) → your relay module is active-LOW; swap <code>HIGH</code>/<code>LOW</code> in the code.</div>
+</div>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>Test 5 — Connect to WiFi</h2>
+<div class="panel"><div class="panel-title">Objective</div>Confirm the ESP32 can join your WiFi network before adding any cloud logic.</div>
+<div class="code-label">Code</div>
+<pre><span class="tok-kw">#include</span> &lt;WiFi.h&gt;
+<span class="tok-kw">const</span> <span class="tok-kw">char</span>* ssid = <span class="tok-str">"YourNetwork"</span>;
+<span class="tok-kw">const</span> <span class="tok-kw">char</span>* password = <span class="tok-str">"YourPassword"</span>;
+
+<span class="tok-kw">void</span> <span class="tok-fn">setup</span>() {
+  Serial.<span class="tok-fn">begin</span>(<span class="tok-str">115200</span>);
+  WiFi.<span class="tok-fn">begin</span>(ssid, password);
+  <span class="tok-kw">while</span> (WiFi.<span class="tok-fn">status</span>() != WL_CONNECTED) {
+    <span class="tok-fn">delay</span>(<span class="tok-str">250</span>);
+    Serial.<span class="tok-fn">print</span>(<span class="tok-str">"."</span>);
+  }
+  Serial.<span class="tok-fn">println</span>(WiFi.<span class="tok-fn">localIP</span>());
+}
+
+<span class="tok-kw">void</span> <span class="tok-fn">loop</span>() {}</pre>
+<div class="grid2">
+<div class="panel"><div class="panel-title">Expected result</div>Serial Monitor prints dots, then an IP address like <code>192.168.1.42</code>.</div>
+<div class="panel"><div class="panel-title">Troubleshooting</div>Never connects → double-check the SSID/password are exact (case-sensitive); the ESP32 only supports 2.4GHz WiFi, not 5GHz.</div>
+</div>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>Test 6 — Push One Record to Supabase</h2>
+<div class="panel"><div class="panel-title">Objective</div>Confirm your Supabase project, table, and keys are all correctly configured, with the simplest possible request.</div>
+<div class="panel"><div class="panel-title">Required</div>A working WiFi connection (Test 5), a Supabase project with the <code>device_status</code> table created (see Part 3).</div>
+<div class="code-label">Code (append to Test 5, after WiFi connects)</div>
+<pre><span class="tok-kw">#include</span> &lt;HTTPClient.h&gt;
+<span class="tok-kw">#include</span> &lt;WiFiClientSecure.h&gt;
+
+WiFiClientSecure client;
+client.<span class="tok-fn">setInsecure</span>();
+HTTPClient http;
+http.<span class="tok-fn">begin</span>(client, <span class="tok-str">"https://YOUR_PROJECT.supabase.co/rest/v1/device_status?on_conflict=device_id"</span>);
+http.<span class="tok-fn">addHeader</span>(<span class="tok-str">"apikey"</span>, <span class="tok-str">"YOUR_ANON_KEY"</span>);
+http.<span class="tok-fn">addHeader</span>(<span class="tok-str">"Authorization"</span>, <span class="tok-str">"Bearer YOUR_ANON_KEY"</span>);
+http.<span class="tok-fn">addHeader</span>(<span class="tok-str">"Content-Type"</span>, <span class="tok-str">"application/json"</span>);
+http.<span class="tok-fn">addHeader</span>(<span class="tok-str">"Prefer"</span>, <span class="tok-str">"resolution=merge-duplicates"</span>);
+<span class="tok-kw">int</span> code = http.<span class="tok-fn">POST</span>(<span class="tok-str">"{\"device_id\":\"TEST01\",\"humidity\":50}"</span>);
+Serial.<span class="tok-fn">println</span>(code);</pre>
+<div class="grid2">
+<div class="panel"><div class="panel-title">Expected result</div>Serial prints a code in the 200s, and a row appears in the Supabase Table Editor.</div>
+<div class="panel"><div class="panel-title">Troubleshooting</div>401/403 → wrong anon key or Row Level Security policy missing. 404 → table name typo or project URL wrong.</div>
+</div>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>Test 7 — Combine the Complete System</h2>
+<div class="panel"><div class="panel-title">Objective</div>Put every piece together: sensor → decision → outputs → LCD → cloud push, all running on independent timers.</div>
+<p>This is exactly the structure covered in the phase-by-phase build on the next slides, ending in the final code in Part 3.</p>
+<div class="checklist">
+<li>Sensor reads humidity once per second</li>
+<li>LCD shows device ID and current humidity</li>
+<li>Humidifier/fan respond correctly to thresholds</li>
+<li>Status appears in the Supabase table within 5 seconds</li>
+<li>Webapp shows "Online" with matching values</li>
+</div>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>2.3 &nbsp;Understanding the Code — Build in Phases</h2>
+<p class="lede">Don't start from the final 440-line sketch. Build it up — each phase adds one capability on top of the last, without rewriting what already works.</p>
+<div class="flow">
+<div class="node"><span class="t">PHASE 1</span>Sensor +<br>Serial only</div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">PHASE 2</span>+ LCD +<br>Control Logic</div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">PHASE 3</span>+ WiFi<br>Provisioning</div>
+<div class="arrow">&rarr;</div>
+<div class="node"><span class="t">FINAL</span>+ Supabase<br>Cloud Push</div>
+</div>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>Phase 1 — Sensor + Serial</h2>
+<p class="dim">Goal: read humidity reliably, once per second, with error handling.</p>
+<pre class="tall"><span class="tok-kw">#include</span> &lt;DHT11.h&gt;
+DHT11 dht11(<span class="tok-str">4</span>);
+<span class="tok-kw">unsigned</span> <span class="tok-kw">long</span> lastReadMs = <span class="tok-str">0</span>;
+<span class="tok-kw">const</span> <span class="tok-kw">unsigned</span> <span class="tok-kw">long</span> READ_INTERVAL_MS = <span class="tok-str">1000</span>;
+
+<span class="tok-kw">void</span> <span class="tok-fn">setup</span>() {
+  Serial.<span class="tok-fn">begin</span>(<span class="tok-str">115200</span>);
+}
+
+<span class="tok-kw">void</span> <span class="tok-fn">loop</span>() {
+  <span class="tok-kw">unsigned</span> <span class="tok-kw">long</span> now = <span class="tok-fn">millis</span>();
+  <span class="tok-kw">if</span> (now - lastReadMs &gt;= READ_INTERVAL_MS) {
+    lastReadMs = now;
+    <span class="tok-kw">int</span> humidity = dht11.<span class="tok-fn">readHumidity</span>();
+    <span class="tok-kw">if</span> (humidity != DHT11::ERROR_CHECKSUM &amp;&amp; humidity != DHT11::ERROR_TIMEOUT) {
+      Serial.<span class="tok-fn">println</span>(humidity);
+    }
+  }
+}</pre>
+<div class="callout good"><strong>New here —</strong> Notice <code>millis()</code> is used instead of <code>delay(1000)</code> — this is the non-blocking timing pattern used throughout the final code, introduced early so it's second nature by the time the project needs several timers at once.</div>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>Phase 2 — Add LCD + Control Logic</h2>
+<p class="dim">Goal: display the reading and drive the humidifier/fan from it. <span class="dim">(Additions to Phase 1 highlighted.)</span></p>
+<pre class="tall"><span class="tok-kw">#include</span> &lt;DHT11.h&gt;
+<span class="tok-kw">#include</span> &lt;Wire.h&gt;
+<span class="tok-com">// + added:</span>
+<span class="tok-kw">#include</span> &lt;LiquidCrystal_I2C.h&gt;
+
+DHT11 dht11(<span class="tok-str">4</span>);
+<span class="tok-com">// + added:</span>
+LiquidCrystal_I2C led(<span class="tok-str">0x27</span>, <span class="tok-str">16</span>, <span class="tok-str">2</span>);
+<span class="tok-kw">const</span> <span class="tok-kw">int</span> humidifierPin = <span class="tok-str">5</span>;
+<span class="tok-kw">const</span> <span class="tok-kw">int</span> fanPin = <span class="tok-str">2</span>;
+<span class="tok-kw">bool</span> isDoorOpen = <span class="tok-kw">false</span>; <span class="tok-com">// tracks fan state</span>
+
+<span class="tok-kw">void</span> <span class="tok-fn">setup</span>() {
+  Serial.<span class="tok-fn">begin</span>(<span class="tok-str">115200</span>);
+  <span class="tok-com">// + added:</span>
+  <span class="tok-fn">pinMode</span>(humidifierPin, OUTPUT);
+  <span class="tok-fn">pinMode</span>(fanPin, OUTPUT);
+  led.<span class="tok-fn">init</span>();
+  led.<span class="tok-fn">backlight</span>();
+}
+
+<span class="tok-com">// readAndControlHumidity() now called from loop() every 1s (same millis() pattern as Phase 1):</span>
+<span class="tok-com">// reads humidity -> updates LCD -> if &lt;45% humidifier ON, if &gt;55% fan ON, else both OFF</span></pre>
+<p class="footnote">The full <code>readAndControlHumidity()</code> function is shown in Part 3's final code — it's the same threshold logic from section 1.3, just with the LCD lines added.</p>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>Phase 3 — Add WiFi Provisioning</h2>
+<p class="dim">Goal: connect to WiFi without hardcoding credentials, with a fallback setup mode. <span class="dim">(Additions to Phase 2 highlighted.)</span></p>
+<pre class="tall"><span class="tok-com">// + added:</span>
+<span class="tok-kw">#include</span> &lt;WiFi.h&gt;
+<span class="tok-kw">#include</span> &lt;WebServer.h&gt;
+<span class="tok-kw">#include</span> &lt;Preferences.h&gt;
+
+Preferences preferences;
+WebServer server(<span class="tok-str">80</span>);
+<span class="tok-kw">bool</span> apMode = <span class="tok-kw">false</span>;
+
+<span class="tok-kw">void</span> <span class="tok-fn">setupWiFi</span>() {
+  <span class="tok-com">// try saved credentials from flash (Preferences) first...</span>
+  <span class="tok-kw">if</span> (<span class="tok-fn">connectWithSavedCredentials</span>()) {
+    apMode = <span class="tok-kw">false</span>;
+    <span class="tok-fn">startServer</span>();       <span class="tok-com">// serves the local status page</span>
+  } <span class="tok-kw">else</span> {
+    <span class="tok-fn">startAPMode</span>();        <span class="tok-com">// no saved WiFi -&gt; become an Access Point</span>
+  }
+}
+
+<span class="tok-com">// setup() now calls setupWiFi() after the LCD/pin init from Phase 2.
+// loop() now also calls server.handleClient() every cycle.</span></pre>
+<p class="footnote">The full WiFi provisioning code (AP setup page, saving credentials, the fixed-IP option) is in Part 3's final code — this phase is about understanding the <em>shape</em> of the logic: try saved credentials, fall back to AP mode.</p>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>Final Phase — Add Supabase Cloud Push</h2>
+<p class="dim">Goal: report status to the cloud every 5 seconds, without blocking anything else. <span class="dim">(Additions to Phase 3 highlighted.)</span></p>
+<pre class="tall"><span class="tok-com">// + added:</span>
+<span class="tok-kw">#include</span> &lt;HTTPClient.h&gt;
+<span class="tok-kw">#include</span> &lt;WiFiClientSecure.h&gt;
+
+<span class="tok-kw">unsigned</span> <span class="tok-kw">long</span> lastPushMs = <span class="tok-str">0</span>;
+<span class="tok-kw">const</span> <span class="tok-kw">unsigned</span> <span class="tok-kw">long</span> PUSH_INTERVAL_MS = <span class="tok-str">5000</span>;
+
+<span class="tok-kw">void</span> <span class="tok-fn">loop</span>() {
+  server.<span class="tok-fn">handleClient</span>();              <span class="tok-com">// from Phase 3</span>
+
+  <span class="tok-kw">unsigned</span> <span class="tok-kw">long</span> now = <span class="tok-fn">millis</span>();
+  <span class="tok-kw">if</span> (now - lastSensorReadMs &gt;= SENSOR_READ_INTERVAL_MS) {
+    lastSensorReadMs = now;
+    <span class="tok-fn">readAndControlHumidity</span>();         <span class="tok-com">// from Phase 2</span>
+  }
+
+  <span class="tok-com">// + added: a THIRD independent timer, same millis() pattern</span>
+  <span class="tok-kw">if</span> (!apMode &amp;&amp; now - lastPushMs &gt;= PUSH_INTERVAL_MS) {
+    lastPushMs = now;
+    <span class="tok-fn">pushStatusToSupabase</span>();
+  }
+}</pre>
+<div class="callout good"><strong>This is the full picture —</strong> three independent, non-blocking timers sharing one <code>loop()</code>. This exact structure is the final code in Part 3.</div>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>2.4 &nbsp;Troubleshooting Guide</h2>
+<table>
+<tr><th>Problem</th><th>Possible Cause</th><th>Solution</th></tr>
+<tr><td>Board not detected by IDE</td><td>Bad USB cable, missing driver, wrong port</td><td>Try a known-good data cable; install CP2102/CH340 driver if needed; check <code>Tools &gt; Port</code></td></tr>
+<tr><td>DHT11 gives checksum/timeout errors</td><td>Loose wiring, reading too fast, missing pull-up</td><td>Re-seat wiring, confirm 1-second read interval, add a 10kΩ pull-up if using a bare sensor</td></tr>
+<tr><td>LCD shows nothing / blocks</td><td>Wrong I2C address, contrast not adjusted</td><td>Try <code>0x3F</code>; run an I2C scanner sketch; turn the contrast potentiometer</td></tr>
+<tr><td>Relay behaves backwards</td><td>Active-LOW relay module</td><td>Swap <code>HIGH</code>/<code>LOW</code> in the code for that pin</td></tr>
+<tr><td>ESP32 won't connect to WiFi</td><td>Wrong password, 5GHz-only network</td><td>Double-check credentials; ESP32 only supports 2.4GHz</td></tr>
+<tr><td>Webapp always shows "Offline"</td><td>HTTPS page can't fetch local HTTP device directly</td><td>This project uses the cloud-push design specifically to avoid this — confirm the device is actually pushing (check Serial Monitor for "Supabase push OK")</td></tr>
+<tr><td>Supabase push fails (401/403)</td><td>Wrong anon key, missing RLS policy</td><td>Re-check the key from Project Settings → API; confirm the insert/update policies exist</td></tr>
+<tr><td>Device stuck in AP setup mode</td><td>Wrong WiFi password entered during setup</td><td>Visit <code>/forget-wifi</code> and redo setup with the correct password</td></tr>
+</table>
+</section>
+
+<section class="slide" data-part="Part 2 — Learn, Test, Understand">
+<h2>2.5 &nbsp;Challenges / Extensions</h2>
+<p class="lede">Once the basic project works end to end, try these — they build real understanding, not just copy-paste skill.</p>
+<div class="grid2">
+<div class="panel"><div class="panel-title">Change behavior</div>Adjust the 45%/55% thresholds, or add hysteresis so the humidifier doesn't rapidly flick on/off near the boundary.</div>
+<div class="panel"><div class="panel-title">Add another sensor</div>The DHT11 also reports temperature — add it to the LCD, the Serial output, and the Supabase payload.</div>
+<div class="panel"><div class="panel-title">Add another output</div>Add a buzzer or LED that alerts when humidity goes far outside the safe range.</div>
+<div class="panel"><div class="panel-title">Improve reliability</div>Make the device retry a failed Supabase push instead of just waiting for the next 5-second cycle.</div>
+<div class="panel"><div class="panel-title">Modify the interface</div>Add a historical chart to the webapp by storing each reading instead of only the latest one.</div>
+<div class="panel"><div class="panel-title">Your own variation</div>Multiple sensors in different rooms, each with its own device ID and card in the webapp.</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- PART 3 -->
+<!-- ============================================================ -->
+
+<section class="slide" data-part="Part 3 — Replicate the Project">
+<div class="divider">
+<div class="num">PART 3 / 3</div>
+<h1>Replicate the Project</h1>
+<p>Everything needed to build this from a completely clean start.</p>
+</div>
+</section>
+
+<section class="slide" data-part="Part 3 — Replicate the Project">
+<h2>3.1 &nbsp;Bill of Materials</h2>
+<table>
+<tr><th>Item</th><th>Qty</th><th>Specification</th><th>Purpose</th><th>Required</th></tr>
+<tr><td>ESP32 dev board</td><td>1</td><td>Any standard ESP32-WROOM DevKit variant</td><td>Main controller</td><td>Required</td></tr>
+<tr><td>DHT11 sensor</td><td>1</td><td>3-pin breakout module (with built-in pull-up)</td><td>Humidity sensing</td><td>Required</td></tr>
+<tr><td>16×2 I2C LCD</td><td>1</td><td>PCF8574 backpack, address 0x27 or 0x3F</td><td>On-device display</td><td>Required</td></tr>
+<tr><td>Relay module ×2 (or 2-channel)</td><td>2</td><td>5V logic-level, with flyback diode</td><td>Switch humidifier + fan</td><td>Required</td></tr>
+<tr><td>Humidifier unit</td><td>1</td><td>Matches your relay's rated voltage/current</td><td>Output device</td><td>Required</td></tr>
+<tr><td>Fan / vent actuator</td><td>1</td><td>Matches your relay's rated voltage/current</td><td>Output device</td><td>Required</td></tr>
+<tr><td>Breadboard + jumper wires</td><td>1 set</td><td>Male-to-male, male-to-female</td><td>Prototyping connections</td><td>Required</td></tr>
+<tr><td>USB cable</td><td>1</td><td>Data-capable (not charge-only), matching ESP32's port</td><td>Programming &amp; power</td><td>Required</td></tr>
+<tr><td>5V power supply</td><td>1</td><td>Sized for the humidifier/fan draw</td><td>Powering the outputs</td><td>Required</td></tr>
+<tr><td>Enclosure / mounting hardware</td><td>—</td><td>Project-dependent</td><td>Housing the build</td><td>Optional</td></tr>
+</table>
+</section>
+
+<section class="slide" data-part="Part 3 — Replicate the Project">
+<h2>3.2 &nbsp;Software Requirements</h2>
+<table>
+<tr><th>Software</th><th>Version / Notes</th><th>OS</th><th>Install From</th></tr>
+<tr><td>Arduino IDE</td><td>2.x (or 1.8+)</td><td>Windows / macOS / Linux</td><td><a href="https://www.arduino.cc/en/software" target="_blank" rel="noopener">arduino.cc/en/software</a></td></tr>
+<tr><td>ESP32 board package</td><td>Latest stable, via Boards Manager</td><td>—</td><td>Add URL below, then install "esp32" from Boards Manager</td></tr>
+<tr><td><code>DHT11</code> library</td><td>Latest, by dhrubasaha08</td><td>—</td><td>Arduino Library Manager</td></tr>
+<tr><td><code>LiquidCrystal I2C</code> library</td><td>Latest, by Frank de Brabander</td><td>—</td><td>Arduino Library Manager</td></tr>
+<tr><td>Supabase account</td><td>Free tier</td><td>Web</td><td><a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a></td></tr>
+<tr><td>Vercel account (or similar static host)</td><td>Free tier</td><td>Web</td><td><a href="https://vercel.com" target="_blank" rel="noopener">vercel.com</a></td></tr>
+</table>
+<div class="panel"><div class="panel-title">ESP32 Boards Manager URL</div><code>https://espressif.github.io/arduino-esp32/package_esp32_index.json</code><br><span class="dim" style="font-size:13px;">Paste this into Arduino IDE → Preferences → Additional Boards Manager URLs, then search "esp32" in Boards Manager.</span></div>
+</section>
+
+<section class="slide" data-part="Part 3 — Replicate the Project">
+<h2>3.3 &nbsp;Project Resources</h2>
+<p class="dim">Links below to be filled in by the instructor.</p>
+<div class="grid2">
+<div class="panel"><div class="panel-title">PROJECT FILES</div><a href="#">[ DOWNLOAD PROJECT FILES ]</a></div>
+<div class="panel"><div class="panel-title">SOURCE CODE</div><a href="#">[ DOWNLOAD SOURCE CODE ]</a></div>
+<div class="panel"><div class="panel-title">ESP32 CODE</div><a href="#">[ DOWNLOAD MICROCONTROLLER CODE ]</a></div>
+<div class="panel"><div class="panel-title">WEBAPP / APP</div><a href="#">[ DOWNLOAD APPLICATION ]</a></div>
+<div class="panel"><div class="panel-title">LIBRARIES / SQL</div><a href="#">[ DOWNLOAD REQUIRED FILES ]</a></div>
+<div class="panel"><div class="panel-title">WIRING DIAGRAM</div><a href="#">[ VIEW / DOWNLOAD WIRING DIAGRAM ]</a></div>
+<div class="panel"><div class="panel-title">DOCUMENTATION</div><a href="#">[ VIEW FULL DOCUMENTATION ]</a></div>
+</div>
+</section>
+
+<section class="slide" data-part="Part 3 — Replicate the Project">
+<h2>3.4 &nbsp;Complete Setup Procedure (1 of 2)</h2>
+<ol class="steps">
+<li><strong>Install Arduino IDE</strong> from arduino.cc.</li>
+<li><strong>Add the ESP32 board package</strong> using the Boards Manager URL on slide 3.2, then install "esp32" and select your exact board under <code>Tools &gt; Board</code>.</li>
+<li><strong>Install libraries</strong> — search and install <code>DHT11</code> (dhrubasaha08) and <code>LiquidCrystal I2C</code> (Frank de Brabander) via Library Manager.</li>
+<li><strong>Download project files</strong> using the links on slide 3.3.</li>
+<li><strong>Wire the hardware</strong> following the table and diagram on slide 3.6.</li>
+<li><strong>Create a Supabase project</strong> — sign up at supabase.com, create a new project, note the Project URL and anon key from Settings → API.</li>
+</ol>
+</section>
+
+<section class="slide" data-part="Part 3 — Replicate the Project">
+<h2>3.4 &nbsp;Complete Setup Procedure (2 of 2)</h2>
+<ol class="steps" start="7">
+<li><strong>Run the setup SQL</strong> (from the downloaded SQL file) in Supabase's SQL Editor to create the <code>device_status</code> table and its access policies.</li>
+<li><strong>Configure the sketch</strong> — open the <code>.ino</code> file, paste your Supabase URL and anon key into the constants near the top.</li>
+<li><strong>Upload the program</strong> to the ESP32 via <code>Sketch &gt; Upload</code>.</li>
+<li><strong>Connect the device to WiFi</strong> — join its <code>ESP32-Setup-&lt;ID&gt;</code> network, open the setup page, select your WiFi, save.</li>
+<li><strong>Deploy the webapp</strong> — paste the same Supabase URL/key into the webapp's config, then deploy it to Vercel (or open it locally).</li>
+<li><strong>Test the system</strong> — register a device in the webapp using its Device ID and confirm it shows "Online" with live readings.</li>
+</ol>
+</section>
+
+<section class="slide" data-part="Part 3 — Replicate the Project">
+<h2>3.5 &nbsp;Wiring Table</h2>
+<table>
+<tr><th>Component</th><th>Pin</th><th>Connects To (ESP32)</th><th>Purpose</th></tr>
+<tr><td rowspan="3">DHT11</td><td>VCC</td><td>3.3V</td><td>Power</td></tr>
+<tr><td>GND</td><td>GND</td><td>Ground</td></tr>
+<tr><td>DATA</td><td><code>GPIO 4</code></td><td>Humidity reading</td></tr>
+<tr><td rowspan="4">LCD (I2C)</td><td>VCC</td><td>5V (VIN)</td><td>Power</td></tr>
+<tr><td>GND</td><td>GND</td><td>Ground</td></tr>
+<tr><td>SDA</td><td><code>GPIO 21</code></td><td>I2C data</td></tr>
+<tr><td>SCL</td><td><code>GPIO 22</code></td><td>I2C clock</td></tr>
+<tr><td>Humidifier relay</td><td>Signal (IN)</td><td><code>GPIO 5</code></td><td>Switches humidifier on/off</td></tr>
+<tr><td>Fan relay</td><td>Signal (IN)</td><td><code>GPIO 2</code></td><td>Switches fan on/off</td></tr>
+</table>
+<div class="callout"><strong>Important —</strong> This table must match the final code exactly. If you move a component to a different pin, update the corresponding constant in the sketch (e.g. <code>const int humidifierPin</code>) to match.</div>
+</section>
+
+<section class="slide" data-part="Part 3 — Replicate the Project">
+<h2>3.6 &nbsp;Final Code — ESP32 Sketch (1 of 3)</h2>
+<div class="code-label">File: <code>esp32_humidity_controller.ino</code> &nbsp;·&nbsp; Board: any ESP32-WROOM DevKit &nbsp;·&nbsp; Fill in <code>SUPABASE_URL</code> / <code>SUPABASE_ANON_KEY</code> before uploading</div>
+<pre class="tall">#include &lt;DHT11.h&gt;
+#include &lt;Wire.h&gt;
+#include &lt;LiquidCrystal_I2C.h&gt;
+#include &lt;WiFi.h&gt;
+#include &lt;WebServer.h&gt;
+#include &lt;Preferences.h&gt;
+#include &lt;HTTPClient.h&gt;
+#include &lt;WiFiClientSecure.h&gt;
+
+LiquidCrystal_I2C led(0x27,16,2);
+DHT11 dht11(4);                    // DATA on GPIO 4
+
+const int humidifierPin = 5;
+const int fanPin = 2;
+bool isDoorOpen = false;           // tracks fan state
+bool humidifierIsOn = false;       // mirrors humidifier relay state
+
+const char* SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
+const char* SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+const char* STATUS_TABLE = "device_status";
+
+unsigned long lastPushMs = 0;
+const unsigned long PUSH_INTERVAL_MS = 5000;
+
+String DEVICE_ID = "";
+Preferences preferences;
+
+void computeDeviceId() {
+    uint64_t mac = ESP.getEfuseMac();
+    char idBuf[7];
+    sprintf(idBuf, "%06X", (uint32_t)(mac & 0xFFFFFFUL));
+    DEVICE_ID = String(idBuf);
+}
+
+void pushStatusToSupabase() {
+    if (WiFi.status() != WL_CONNECTED) return;
+    WiFiClientSecure client;
+    client.setInsecure();
+    HTTPClient http;
+    String url = String(SUPABASE_URL) + "/rest/v1/" + STATUS_TABLE + "?on_conflict=device_id";
+    if (!http.begin(client, url)) { Serial.println("Supabase push: failed to begin request"); return; }
+    http.addHeader("apikey", SUPABASE_ANON_KEY);
+    http.addHeader("Authorization", String("Bearer ") + SUPABASE_ANON_KEY);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Prefer", "resolution=merge-duplicates,return=minimal");
+    String json = "{";
+    json += "\"device_id\":\"" + DEVICE_ID + "\",";
+    json += "\"humidity\":" + String(lastHumidityValid ? lastHumidity : -1) + ",";
+    json += "\"humidity_valid\":" + String(lastHumidityValid ? "true" : "false") + ",";
+    json += "\"humidifier_on\":" + String(humidifierIsOn ? "true" : "false") + ",";
+    json += "\"fan_on\":" + String(isDoorOpen ? "true" : "false");
+    json += "}";
+    int httpCode = http.POST(json);
+    if (httpCode > 0 && httpCode < 300) { Serial.println("Supabase push OK"); }
+    else { Serial.print("Supabase push failed, code: "); Serial.println(httpCode); Serial.println(http.getString()); }
+    http.end();
+}</pre>
+</section>
+
+<section class="slide" data-part="Part 3 — Replicate the Project">
+<h2>3.6 &nbsp;Final Code — ESP32 Sketch (2 of 3)</h2>
+<div class="code-label">Continued — WiFi provisioning (saved credentials, AP fallback, setup page, optional fixed IP)</div>
+<pre class="tall">WebServer server(80);
+const char* AP_SSID_PREFIX = "ESP32-Setup-";
+const char* AP_PASSWORD = "";
+bool apMode = false;
+const unsigned long WIFI_CONNECT_TIMEOUT_MS = 15000;
+unsigned long lastSensorReadMs = 0;
+const unsigned long SENSOR_READ_INTERVAL_MS = 1000;
+int lastHumidity = -1;
+bool lastHumidityValid = false;
+
+void handleStatusPage() {
+    String html = "&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;head&gt;&lt;meta name='viewport' content='width=device-width, initial-scale=1'&gt;";
+    html += "&lt;title&gt;ESP32 Monitor&lt;/title&gt;&lt;/head&gt;&lt;body style='font-family:Arial;padding:20px;'&gt;";
+    html += "&lt;h2&gt;Device Online&lt;/h2&gt;";
+    html += "&lt;p&gt;Device ID: &lt;b&gt;" + DEVICE_ID + "&lt;/b&gt;&lt;/p&gt;";
+    html += "&lt;p&gt;Humidity: " + String(lastHumidityValid ? String(lastHumidity) + " %" : "--") + "&lt;/p&gt;";
+    html += "&lt;p&gt;Status pushes to the cloud every " + String(PUSH_INTERVAL_MS / 1000) + "s automatically.&lt;/p&gt;";
+    html += "&lt;p&gt;&lt;a href='/forget-wifi' style='color:#d9483b;'&gt;Forget WiFi &amp;amp; reset&lt;/a&gt;&lt;/p&gt;";
+    html += "&lt;/body&gt;&lt;/html&gt;";
+    server.send(200, "text/html", html);
+}
+
+void handleForgetWifi() {
+    preferences.begin("wifi", false);
+    preferences.clear();
+    preferences.end();
+    server.send(200, "text/html", "&lt;h3&gt;WiFi cleared. Restarting...&lt;/h3&gt;");
+    delay(1500);
+    ESP.restart();
+}
+
+bool connectOnce(const String&amp; ssid, const String&amp; password, unsigned long timeoutMs) {
+    WiFi.begin(ssid.c_str(), password.c_str());
+    unsigned long start = millis();
+    while (WiFi.status() != WL_CONNECTED &amp;&amp; millis() - start &lt; timeoutMs) { delay(250); Serial.print("."); }
+    Serial.println();
+    return WiFi.status() == WL_CONNECTED;
+}
+
+bool connectWithSavedCredentials() {
+    preferences.begin("wifi", true);
+    String ssid = preferences.getString("ssid", "");
+    String password = preferences.getString("password", "");
+    String staticOctetStr = preferences.getString("octet", "");
+    preferences.end();
+    if (ssid.length() == 0) { Serial.println("No saved WiFi credentials found."); return false; }
+    WiFi.mode(WIFI_STA);
+    if (!connectOnce(ssid, password, WIFI_CONNECT_TIMEOUT_MS)) { return false; }
+    if (staticOctetStr.length() &gt; 0) {
+        int octet = staticOctetStr.toInt();
+        if (octet &gt;= 2 &amp;&amp; octet &lt;= 254) {
+            IPAddress gateway = WiFi.gatewayIP();
+            IPAddress subnet = WiFi.subnetMask();
+            IPAddress dns = WiFi.dnsIP();
+            IPAddress staticIP(gateway[0], gateway[1], gateway[2], octet);
+            WiFi.disconnect(true, false);
+            delay(300);
+            WiFi.config(staticIP, gateway, subnet, dns);
+            if (!connectOnce(ssid, password, 10000)) {
+                WiFi.config(IPADDR_NONE, IPADDR_NONE, IPADDR_NONE);
+                connectOnce(ssid, password, WIFI_CONNECT_TIMEOUT_MS);
+            }
+        }
+    }
+    return WiFi.status() == WL_CONNECTED;
+}</pre>
+<p class="footnote">The AP setup page HTML (<code>handleRoot()</code>, <code>handleSave()</code>, <code>startAPMode()</code>) follows the same pattern shown in section 1.10 — full version in the downloadable source file (slide 3.3), omitted here for length.</p>
+</section>
+
+<section class="slide" data-part="Part 3 — Replicate the Project">
+<h2>3.6 &nbsp;Final Code — ESP32 Sketch (3 of 3)</h2>
+<div class="code-label">Continued — sensor control loop and the combined <code>setup()</code> / <code>loop()</code></div>
+<pre class="tall">void readAndControlHumidity() {
+    int humidity = dht11.readHumidity();
+    led.setCursor(0,1); led.print("RH: "); led.print(humidity); led.print("%   ");
+    led.setCursor(0,0); led.print("ID: " + DEVICE_ID);
+
+    if (humidity != DHT11::ERROR_CHECKSUM &amp;&amp; humidity != DHT11::ERROR_TIMEOUT) {
+        lastHumidity = humidity;
+        lastHumidityValid = true;
+    } else {
+        Serial.println(DHT11::getErrorString(humidity));
+        lastHumidityValid = false;
+        return;
+    }
+
+    if (humidity &lt; 45) {
+        if (isDoorOpen) { digitalWrite(fanPin, LOW); isDoorOpen = false; }
+        digitalWrite(humidifierPin, HIGH);
+        humidifierIsOn = true;
+    }
+    else if (humidity &gt; 55) {
+        if (!isDoorOpen) { digitalWrite(fanPin, HIGH); isDoorOpen = true; }
+        digitalWrite(humidifierPin, LOW);
+        humidifierIsOn = false;
+    }
+    else {
+        if (isDoorOpen) { digitalWrite(fanPin, LOW); isDoorOpen = false; }
+        digitalWrite(humidifierPin, LOW);
+        humidifierIsOn = false;
+    }
+}
+
+void setupWiFi() {
+    if (connectWithSavedCredentials()) { apMode = false; server.begin(); }
+    else { apMode = true; WiFi.mode(WIFI_AP);
+           WiFi.softAP((String(AP_SSID_PREFIX) + DEVICE_ID).c_str()); server.begin(); }
+}
+
+void setup() {
+    Serial.begin(115200);
+    pinMode(humidifierPin, OUTPUT);
+    pinMode(fanPin, OUTPUT);
+    led.init();
+    led.backlight();
+    computeDeviceId();
+    setupWiFi();
+}
+
+void loop() {
+    server.handleClient();
+    unsigned long now = millis();
+    if (now - lastSensorReadMs &gt;= SENSOR_READ_INTERVAL_MS) {
+        lastSensorReadMs = now;
+        readAndControlHumidity();
+    }
+    if (!apMode &amp;&amp; now - lastPushMs &gt;= PUSH_INTERVAL_MS) {
+        lastPushMs = now;
+        pushStatusToSupabase();
+    }
+}</pre>
+<div class="callout"><strong>Full file —</strong> This is the complete logic, condensed slightly for slide space (the AP setup page markup from slide 2's Phase 3 is abbreviated here). The exact, uncondensed <code>.ino</code> file is in the downloadable Source Code link (slide 3.3) — use that file to actually flash the board.</div>
+</section>
+
+<section class="slide" data-part="Part 3 — Replicate the Project">
+<h2>3.7 &nbsp;Supabase Table Setup (SQL)</h2>
+<div class="code-label">Run once in Supabase → SQL Editor</div>
+<pre class="tall">create table device_status (
+  device_id text primary key,
+  humidity integer,
+  humidity_valid boolean,
+  humidifier_on boolean,
+  fan_on boolean,
+  updated_at timestamptz default now()
+);
+
+alter table device_status enable row level security;
+
+create policy "Public can read device status" on device_status
+  for select using (true);
+create policy "Public can insert device status" on device_status
+  for insert with check (true);
+create policy "Public can update device status" on device_status
+  for update using (true) with check (true);
+
+-- Keeps updated_at accurate on every push, not just the first insert
+create or replace function set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger device_status_set_updated_at
+before insert or update on device_status
+for each row execute function set_updated_at();</pre>
+<div class="callout"><strong>Security note —</strong> These policies make the table publicly readable/writable by anyone holding the project's anon key. That's acceptable for a classroom/personal project but is <strong>not</strong> suitable for storing private data — a production system would add real authentication.</div>
+</section>
+
+<section class="slide" data-part="Part 3 — Replicate the Project">
+<h2>3.8 &nbsp;Final Verification Checklist</h2>
+<ul class="checklist">
+<li>Hardware assembled and wiring matches the table in 3.5</li>
+<li>Correct power supply used for the humidifier/fan</li>
+<li>Arduino IDE and ESP32 board package installed</li>
+<li><code>DHT11</code> and <code>LiquidCrystal I2C</code> libraries installed (correct ones — see 1.6)</li>
+<li>Correct board selected under <code>Tools &gt; Board</code></li>
+<li>Correct port selected under <code>Tools &gt; Port</code></li>
+<li>Supabase project created, SQL from 3.7 run successfully</li>
+<li><code>SUPABASE_URL</code> / <code>SUPABASE_ANON_KEY</code> filled in, code uploaded without errors</li>
+<li>Device connects to WiFi (LCD shows its IP briefly after boot)</li>
+<li>Serial Monitor shows "Supabase push OK" every 5 seconds</li>
+<li>Webapp deployed, with the matching Supabase URL/key filled in</li>
+<li>Device registered in the webapp by its Device ID, shows "Online"</li>
+<li>Humidifier/fan respond correctly when you change the humidity (e.g. breathe near the sensor)</li>
+</ul>
+</section>
+
+<section class="slide" data-part="Part 3 — Replicate the Project">
+<h2>3.9 &nbsp;Expected Final Result</h2>
+<div class="grid2">
+<div class="panel">
+<div class="panel-title">Hardware behavior</div>
+<p style="margin:0;">LCD shows the device's ID and live humidity reading, updating once per second. Humidifier switches on below 45% RH; fan switches on above 55% RH; both off in between.</p>
+</div>
+<div class="panel">
+<div class="panel-title">Webapp behavior</div>
+<p style="margin:0;">Registered item shows a green "Online" dot, live humidity, and humidifier/fan state, refreshing every few seconds — from any phone or laptop, on any network.</p>
+</div>
+</div>
+<h3>Example test procedure</h3>
+<ol class="steps">
+<li>Power on the device and confirm the LCD shows its ID within a few seconds.</li>
+<li>Open the webapp on a phone on a <em>different</em> network than the device and confirm it shows "Online."</li>
+<li>Breathe gently near the sensor (or use a damp cloth) to raise humidity above 55% and confirm the fan turns on, both on the LCD and in the webapp.</li>
+<li>Let humidity settle and confirm the humidifier and fan both turn off within a few readings.</li>
+</ol>
+</section>
+
+<section class="slide" data-part="Reference">
+<div class="divider">
+<div class="num">QUICK REFERENCE</div>
+<h1>One-Page Summary</h1>
+<p>Everything on one slide for quick lookup during class.</p>
+</div>
+</section>
+
+<section class="slide" data-part="Reference">
+<h2>Quick Reference</h2>
+<div class="grid2">
+<div class="panel">
+<div class="panel-title">Architecture</div>
+DHT11 → ESP32 → Relay/Fan (local)<br>ESP32 → WiFi → Supabase → Webapp (cloud)
+</div>
+<div class="panel">
+<div class="panel-title">Pinout</div>
+DHT11: <code>GPIO 4</code> &nbsp;·&nbsp; LCD SDA/SCL: <code>GPIO 21/22</code><br>Humidifier: <code>GPIO 5</code> &nbsp;·&nbsp; Fan: <code>GPIO 2</code>
+</div>
+<div class="panel">
+<div class="panel-title">Software</div>
+Arduino IDE 2.x + ESP32 core · <code>DHT11</code> + <code>LiquidCrystal I2C</code> libraries · Supabase (free tier)
+</div>
+<div class="panel">
+<div class="panel-title">Important settings</div>
+Thresholds: &lt;45% / &gt;55% RH &nbsp;·&nbsp; Sensor read: 1s &nbsp;·&nbsp; Cloud push: 5s
+</div>
+<div class="panel">
+<div class="panel-title">Download links</div>
+<a href="#">[ Project files ]</a> &nbsp;·&nbsp; <a href="#">[ Source code ]</a> &nbsp;·&nbsp; <a href="#">[ Documentation ]</a>
+</div>
+<div class="panel">
+<div class="panel-title">Troubleshooting</div>
+See section 2.4 for the full table of common problems and fixes.
+</div>
+</div>
+<div class="footnote" style="margin-top:18px;">
+Instructor: [NAME] &nbsp;·&nbsp; Project Repository: [LINK] &nbsp;·&nbsp; Download Files: [LINK] &nbsp;·&nbsp; Documentation: [LINK] &nbsp;·&nbsp; Version: [VERSION] &nbsp;·&nbsp; Last Updated: [DATE]
+</div>
+</section>
+
+</template>
+
+<script>
+const tpl = document.getElementById('slides-template');
+const deck = document.getElementById('deck');
+deck.appendChild(tpl.content.cloneNode(true));
+
+const slides = Array.from(document.querySelectorAll('.slide'));
+let current = 0;
+
+const jumpSelect = document.getElementById('jump');
+slides.forEach((s, i) => {
+    const opt = document.createElement('option');
+    const h = s.querySelector('h1, h2');
+    opt.textContent = (i+1) + '. ' + (h ? h.textContent.replace(/\u00a0/g,' ') : s.dataset.part);
+    jumpSelect.appendChild(opt);
+});
+
+function render(){
+    slides.forEach((s, i) => s.classList.toggle('active', i === current));
+    document.getElementById('slideCounter').textContent = (current+1) + ' / ' + slides.length;
+    document.getElementById('partLabel').textContent = slides[current].dataset.part || '';
+    document.getElementById('progressBar').style.width = (((current+1)/slides.length)*100) + '%';
+    document.getElementById('prevBtn').disabled = current === 0;
+    document.getElementById('nextBtn').disabled = current === slides.length - 1;
+    jumpSelect.selectedIndex = current;
+    slides[current].scrollTop = 0;
+    try { localStorage.setItem('handover-deck-slide', String(current)); } catch(e) {}
+}
+
+function goTo(i){
+    if (i < 0 || i >= slides.length) return;
+    current = i;
+    render();
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { goTo(current+1); e.preventDefault(); }
+    if (e.key === 'ArrowLeft') { goTo(current-1); e.preventDefault(); }
+});
+
+let startX = null;
+document.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, {passive:true});
+document.addEventListener('touchend', (e) => {
+    if (startX === null) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 60) { dx < 0 ? goTo(current+1) : goTo(current-1); }
+    startX = null;
+}, {passive:true});
+
+(function restore(){
+    try {
+        const saved = parseInt(localStorage.getItem('handover-deck-slide'), 10);
+        if (!isNaN(saved) && saved >= 0 && saved < slides.length) current = saved;
+    } catch(e) {}
+    render();
+})();
+</script>
+
+</body>
+</html>
