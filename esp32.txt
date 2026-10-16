@@ -16,19 +16,21 @@ const int humidifierPin = 5;
 
 const int fanPin = 2;
 
-bool isDoorOpen = false;
+bool isDoorOpen = false;       // true = fan ON (the old name was kept from the original code)
 
 // Mirrors exactly what the control logic below decided, so the cloud
 // status always agrees with what Serial Monitor prints.
 bool humidifierIsOn = false;
+
+// Latest sensor reading (shared by the display, the cloud push and the status page)
 int lastHumidity = -1;
 bool lastHumidityValid = false;
 
 /* ---------------------------------------------------------
    SUPABASE CONFIG - fill these in (same project as the webapp)
 --------------------------------------------------------- */
-const char* SUPABASE_URL = "https://wombrzqbekhjcehopijd.supabase.co";    // e.g. "https://xxxxxxxx.supabase.co"
-const char* SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndvbWJyenFiZWtoamNlaG9waWpkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzMzEwODIsImV4cCI6MjEwNTkwNzA4Mn0.m_X5WagE-vsfzcSRl2fjLk5ecqe5u43xYrUKNwg3TE0";  // Project Settings -> API -> anon public key
+const char* SUPABASE_URL = "https://jyhvrfsncmsimthymjgu.supabase.co";    // e.g. "https://xxxxxxxx.supabase.co"
+const char* SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5aHZyZnNuY21zaW10aHltamd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1Mzc1NzQsImV4cCI6MjEwNzExMzU3NH0.rT-dQUnSMNvYd2TbcNGx5I5l0qtthkKXGml1WRqHc44";  // Project Settings -> API -> anon public key
 const char* STATUS_TABLE = "device_status";
 
 unsigned long lastPushMs = 0;
@@ -112,7 +114,7 @@ void pushStatusToSupabase() {
 
 WebServer server(80);
 
-const char* AP_SSID_PREFIX = "ESP32-Setup-"; // full AP name includes the device ID, e.g. ESP32-Setup-A1B2C3
+const char* AP_SSID_PREFIX = "Setup-";        // full AP name = prefix + device ID, e.g. Setup-A1B2C3 (short so it fits on the LCD)
 const char* AP_PASSWORD = "";                 // "" = open AP. Set a password (min 8 chars) to secure it.
 
 bool apMode = false;
@@ -240,6 +242,44 @@ void startServer() {
     server.begin();
 }
 
+// Writes one 16-character LCD row (pads with spaces so old text is erased)
+void lcdRow(int row, String text) {
+    while (text.length() < 16) text += " ";
+    led.setCursor(0, row);
+    led.print(text.substring(0, 16));
+}
+
+unsigned long lastApScreenMs = 0;
+int apScreen = 0;
+
+// In setup mode the LCD rotates the instructions every 3 seconds:
+// join the WiFi -> (its password, if you set one) -> open the page -> device ID
+void showApScreen() {
+    String apName = String(AP_SSID_PREFIX) + DEVICE_ID;
+    String line0[4];
+    String line1[4];
+    int n = 0;
+
+    line0[n] = "Join WiFi:";
+    line1[n++] = apName;
+
+    if (strlen(AP_PASSWORD) > 0) {
+        line0[n] = "WiFi password:";
+        line1[n++] = AP_PASSWORD;
+    }
+
+    line0[n] = "Then open page:";
+    line1[n++] = WiFi.softAPIP().toString();
+
+    line0[n] = "Device ID:";
+    line1[n++] = DEVICE_ID;
+
+    apScreen = apScreen % n;
+    lcdRow(0, line0[apScreen]);
+    lcdRow(1, line1[apScreen]);
+    apScreen++;
+}
+
 void startAPMode() {
     apMode = true;
 
@@ -255,11 +295,8 @@ void startAPMode() {
     Serial.print("Then open: http://");
     Serial.println(WiFi.softAPIP());
 
-    led.clear();
-    led.setCursor(0,0);
-    led.print("ID: " + DEVICE_ID);
-    led.setCursor(0,1);
-    led.print(WiFi.softAPIP());
+    showApScreen();
+    lastApScreenMs = millis();
 }
 
 bool connectOnce(const String& ssid, const String& password, unsigned long timeoutMs) {
@@ -290,6 +327,9 @@ bool connectWithSavedCredentials() {
     Serial.print("Connecting to saved network: ");
     Serial.println(ssid);
 
+    lcdRow(0, "ID: " + DEVICE_ID);
+    lcdRow(1, "Connecting WiFi");
+
     WiFi.mode(WIFI_STA);
 
     if (!connectOnce(ssid, password, WIFI_CONNECT_TIMEOUT_MS)) {
@@ -316,7 +356,8 @@ bool connectWithSavedCredentials() {
 
             if (!connectOnce(ssid, password, 10000)) {
                 Serial.println("Fixed IP failed, falling back to automatic address.");
-                WiFi.config(IPADDR_NONE, IPADDR_NONE, IPADDR_NONE);
+                IPAddress zero(0, 0, 0, 0);
+                WiFi.config(zero, zero, zero);   // all zeros = automatic (DHCP) address
                 connectOnce(ssid, password, WIFI_CONNECT_TIMEOUT_MS);
             }
         }
@@ -350,61 +391,48 @@ void setupWiFi() {
 }
 
 /* ---------------------------------------------------------
-   SENSOR / HUMIDIFIER CONTROL (unchanged logic)
+   SENSOR / HUMIDIFIER CONTROL
 --------------------------------------------------------- */
 
 void readAndControlHumidity() {
     int humidity = dht11.readHumidity();
+    bool showOnLcd = !apMode;           // in setup mode the LCD shows the setup instructions instead
 
-    led.setCursor(0,1);
-    led.print("RH: ");
-    led.print(humidity);
-    led.print("%   ");
-    led.setCursor(0,0);
-    led.print("ID: " + DEVICE_ID);
+    if (showOnLcd) lcdRow(0, "ID: " + DEVICE_ID);
 
-    if (humidity != DHT11::ERROR_CHECKSUM && humidity != DHT11::ERROR_TIMEOUT) {
-        Serial.print("Humidity: ");
-        Serial.print(humidity);
-        Serial.println(" %");
-        lastHumidity = humidity;
-        lastHumidityValid = true;
-    } else {
+    if (humidity == DHT11::ERROR_CHECKSUM || humidity == DHT11::ERROR_TIMEOUT) {
         Serial.println(DHT11::getErrorString(humidity));
         lastHumidityValid = false;
-        return;
+        if (showOnLcd) lcdRow(1, "RH: --");
+        return;                         // keep the outputs as they were
     }
 
+    lastHumidity = humidity;
+    lastHumidityValid = true;
+
+    if (showOnLcd) lcdRow(1, "RH: " + String(humidity) + "%");
+
+    // Below 45% -> humidifier ON | above 55% -> fan ON | in between -> both OFF
     if (humidity < 45) {
-        if (isDoorOpen) {
-            digitalWrite(fanPin, LOW);
-            isDoorOpen = false;
-        }
-        Serial.print("Door is closed");
-        digitalWrite(humidifierPin, HIGH);
         humidifierIsOn = true;
-        Serial.println(" | Humidifier is ON");
-    }
-    else if (humidity > 55) {
-        if (!isDoorOpen) {
-            digitalWrite(fanPin, HIGH);
-            isDoorOpen = true;
-        }
-        Serial.print("Door is opened");
-        digitalWrite(humidifierPin, LOW);
+        isDoorOpen = false;
+    } else if (humidity > 55) {
         humidifierIsOn = false;
-        Serial.println(" | Humidifier is OFF");
-    }
-    else {
-        if (isDoorOpen) {
-            digitalWrite(fanPin, LOW);
-            isDoorOpen = false;
-        }
-        Serial.print("Door is closed");
-        digitalWrite(humidifierPin, LOW);
+        isDoorOpen = true;
+    } else {
         humidifierIsOn = false;
-        Serial.println(" | Humidifier is OFF");
+        isDoorOpen = false;
     }
+
+    digitalWrite(humidifierPin, humidifierIsOn ? HIGH : LOW);
+    digitalWrite(fanPin, isDoorOpen ? HIGH : LOW);
+
+    Serial.print("Humidity: ");
+    Serial.print(humidity);
+    Serial.print(" % | Fan is ");
+    Serial.print(isDoorOpen ? "ON" : "OFF");
+    Serial.print(" | Humidifier is ");
+    Serial.println(humidifierIsOn ? "ON" : "OFF");
 }
 
 void setup() {
@@ -430,6 +458,11 @@ void loop() {
     if (now - lastSensorReadMs >= SENSOR_READ_INTERVAL_MS) {
         lastSensorReadMs = now;
         readAndControlHumidity();
+    }
+
+    if (apMode && now - lastApScreenMs >= 3000) {
+        lastApScreenMs = now;
+        showApScreen();
     }
 
     if (!apMode && now - lastPushMs >= PUSH_INTERVAL_MS) {
